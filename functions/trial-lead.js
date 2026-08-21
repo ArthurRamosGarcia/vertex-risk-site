@@ -1,114 +1,140 @@
 // ═══════════════════════════════════════════════════════════════════
-// Vertex Risk — Captura de lead do trial grátis
+// Vertex Risk — Captura de lead do trial grátis (versão Cloudflare Pages)
 // ═══════════════════════════════════════════════════════════════════
 //
-// O QUE ESSA FUNÇÃO FAZ:
-//   1. Recebe nome + e-mail de quem pediu o trial grátis no site
-//   2. Envia um e-mail pro VISITANTE, com o link de download + o guia
-//      de onboarding + instruções de ativação (opção [T] no ativador)
-//   3. Envia um e-mail simples pro Arthur, avisando quem baixou
-//      (com nome e e-mail reais, não mais anônimo)
+// Mesma lógica da versão Netlify, só que na sintaxe própria da
+// Cloudflare (Pages Functions). Fica em functions/trial-lead.js na
+// raiz do projeto — isso sozinho já cria a rota /trial-lead
+// automaticamente, sem precisar de configuração extra.
 //
-// CONFIGURAÇÃO NECESSÁRIA (Netlify → Site settings → Environment variables):
-//   RESEND_API_KEY   -> Chave de API do Resend (resend.com, plano grátis)
-//   DOWNLOAD_LINK    -> Link de download do VertexRisk_Setup.exe
-//   NOTIFY_EMAIL     -> vertexrisk@gmail.com (ou o e-mail que quiser)
-//
-// O guia de onboarding precisa estar publicado no site em:
-//   https://vertexrisk.com.br/Vertex_Risk_Guia_Onboarding.docx
-// (basta subir o arquivo .docx junto com o index.html, termos.html etc.
-//  no mesmo deploy do Netlify — sem pasta especial, direto na raiz)
+// CONFIGURAÇÃO NECESSÁRIA (painel Cloudflare Pages → Settings →
+// Environment variables):
+//   RESEND_API_KEY   -> Chave de API do Resend
+//   DOWNLOAD_LINK    -> Link do instalador (agora no Cloudflare R2)
+//   NOTIFY_EMAIL     -> vertexrisk@gmail.com
 // ═══════════════════════════════════════════════════════════════════
 
-async function enviarEmail({ to, subject, html }) {
-  const resp = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: 'Vertex Risk <contato@vertexrisk.com.br>',
-      to,
-      subject,
-      html,
-    }),
-  });
-  if (!resp.ok) {
-    const erro = await resp.text();
-    throw new Error(`Erro ao enviar e-mail: ${erro}`);
-  }
-}
-
-function emailBoasVindas(nome) {
-  const linkGuia = 'https://vertexrisk.com.br/Vertex_Risk_Guia_Onboarding.docx';
-  return `
-    <div style="font-family:Arial,sans-serif;background:#F7F8F4;padding:40px 20px;">
-      <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border:1px solid #DCE1D8;border-radius:8px;overflow:hidden;">
-        <div style="background:#0F3D24;padding:28px 36px;">
-          <span style="color:#FFFFFF;font-weight:bold;font-size:16px;">VERTEX RISK</span>
-        </div>
-        <div style="padding:36px;">
-          <h1 style="font-family:Georgia,serif;font-size:24px;color:#16201A;margin:0 0 8px;">Seu teste de 15 dias está pronto.</h1>
-          <p style="color:#5B655D;font-size:15px;line-height:1.6;">Obrigado pelo interesse, ${nome}! Seguem o instalador e o guia completo pra você começar.</p>
-
-          <p style="text-align:center;margin:28px 0 12px;">
-            <a href="${process.env.DOWNLOAD_LINK}" style="background:#1D7346;color:#FFFFFF;font-weight:bold;font-size:14px;text-decoration:none;padding:14px 32px;border-radius:4px;display:inline-block;">Baixar o instalador →</a>
-          </p>
-          <p style="text-align:center;margin:0 0 28px;">
-            <a href="${linkGuia}" style="color:#1D7346;font-size:13px;text-decoration:underline;">Baixar o Guia de Onboarding completo (Word)</a>
-          </p>
-
-          <div style="background:#F7F8F4;border:1px solid #DCE1D8;border-radius:6px;padding:20px 24px;margin-bottom:24px;">
-            <p style="font-family:monospace;font-size:11px;color:#8B948A;margin:0 0 10px;">COMO ATIVAR O TRIAL</p>
-            <ol style="color:#16201A;font-size:14px;line-height:1.8;margin:0;padding-left:18px;">
-              <li>Execute o instalador baixado acima</li>
-              <li>Ao final, o ativador abre sozinho</li>
-              <li>Escolha a opção <strong>[T] — Testar grátis por 15 dias</strong></li>
-              <li>Pronto — sem precisar de chave nem cartão de crédito</li>
-            </ol>
-          </div>
-
-          <p style="color:#8B948A;font-size:13px;line-height:1.6;margin:0;">Dúvidas? Responda este e-mail ou chame no WhatsApp — o guia completo (link acima) também cobre configuração do Excel e solução de problemas comuns.</p>
-        </div>
-      </div>
-    </div>`;
-}
-
-exports.handler = async function (event) {
+export async function onRequestPost(context) {
+  // Captura QUALQUER erro possível, em qualquer ponto — inclusive
+  // problemas ao ler o context/request, que ficariam fora de um
+  // try/catch mais restrito. Isso garante que a resposta SEMPRE seja
+  // um JSON válido, mesmo em caso de falha, com detalhes do que
+  // aconteceu — assim dá pra diagnosticar direto pela aba Network do
+  // navegador, sem precisar dos logs em tempo real da Cloudflare.
   try {
-    if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: 'Method Not Allowed' };
+    const { request, env } = context;
+
+    if (!env || !env.RESEND_API_KEY) {
+      return new Response(
+        JSON.stringify({ erro: 'RESEND_API_KEY não configurada nas variáveis de ambiente.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!env.DOWNLOAD_LINK) {
+      return new Response(
+        JSON.stringify({ erro: 'DOWNLOAD_LINK não configurada nas variáveis de ambiente.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!env.NOTIFY_EMAIL) {
+      return new Response(
+        JSON.stringify({ erro: 'NOTIFY_EMAIL não configurada nas variáveis de ambiente.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
-    const dados = JSON.parse(event.body);
+    let dados;
+    try {
+      dados = await request.json();
+    } catch (erroJson) {
+      return new Response(
+        JSON.stringify({ erro: 'Corpo da requisição não é um JSON válido: ' + erroJson.message }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const nome = (dados.nome || '').trim();
     const email = (dados.email || '').trim();
 
     if (!nome || !email || !email.includes('@')) {
-      return { statusCode: 400, body: JSON.stringify({ erro: 'Nome e e-mail válidos são obrigatórios.' }) };
+      return new Response(
+        JSON.stringify({ erro: 'Nome e e-mail válidos são obrigatórios.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
-    // E-mail pro visitante, com o guia + instruções
-    await enviarEmail({
-      to: email,
-      subject: 'Seu trial Vertex Risk — 15 dias grátis',
-      html: emailBoasVindas(nome),
-    });
+    const linkGuia = 'https://vertexrisk.com.br/Vertex_Risk_Guia_Onboarding.docx';
+    const htmlVisitante = `
+      <div style="font-family:Arial,sans-serif;background:#F7F8F4;padding:40px 20px;">
+        <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border:1px solid #DCE1D8;border-radius:8px;overflow:hidden;">
+          <div style="background:#0F3D24;padding:28px 36px;">
+            <span style="color:#FFFFFF;font-weight:bold;font-size:16px;">VERTEX RISK</span>
+          </div>
+          <div style="padding:36px;">
+            <h1 style="font-family:Georgia,serif;font-size:24px;color:#16201A;margin:0 0 8px;">Seu teste de 15 dias está pronto.</h1>
+            <p style="color:#5B655D;font-size:15px;line-height:1.6;">Obrigado pelo interesse, ${nome}! Seguem o instalador e o guia completo pra você começar.</p>
+            <p style="text-align:center;margin:28px 0 12px;">
+              <a href="${env.DOWNLOAD_LINK}" style="background:#1D7346;color:#FFFFFF;font-weight:bold;font-size:14px;text-decoration:none;padding:14px 32px;border-radius:4px;display:inline-block;">Baixar o instalador →</a>
+            </p>
+            <p style="text-align:center;margin:0 0 28px;">
+              <a href="${linkGuia}" style="color:#1D7346;font-size:13px;text-decoration:underline;">Baixar o Guia de Onboarding completo (Word)</a>
+            </p>
+            <div style="background:#F7F8F4;border:1px solid #DCE1D8;border-radius:6px;padding:20px 24px;margin-bottom:24px;">
+              <p style="font-family:monospace;font-size:11px;color:#8B948A;margin:0 0 10px;">COMO ATIVAR O TRIAL</p>
+              <ol style="color:#16201A;font-size:14px;line-height:1.8;margin:0;padding-left:18px;">
+                <li>Execute o instalador baixado acima</li>
+                <li>Ao final, o ativador abre sozinho</li>
+                <li>Escolha a opção <strong>[T] — Testar grátis por 15 dias</strong></li>
+                <li>Pronto — sem precisar de chave nem cartão de crédito</li>
+              </ol>
+            </div>
+            <p style="color:#8B948A;font-size:13px;line-height:1.6;margin:0;">Dúvidas? Responda este e-mail ou chame no WhatsApp.</p>
+          </div>
+        </div>
+      </div>`;
 
-    // Aviso simples pro Arthur, com quem baixou
-    await enviarEmail({
-      to: process.env.NOTIFY_EMAIL,
-      subject: `Novo trial: ${nome}`,
-      html: `<p>${nome} (${email}) acabou de solicitar o trial de 15 dias.</p>`,
-    });
+    async function enviar(to, subject, html) {
+      const resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from: 'Vertex Risk <contato@vertexrisk.com.br>', to, subject, html }),
+      });
+      const corpoResposta = await resp.text();
+      if (!resp.ok) {
+        throw new Error(`Resend recusou o envio (status ${resp.status}): ${corpoResposta}`);
+      }
+      return corpoResposta;
+    }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ ok: true, downloadLink: process.env.DOWNLOAD_LINK }),
-    };
-  } catch (erro) {
-    console.error('Erro na captura de trial:', erro);
-    return { statusCode: 500, body: JSON.stringify({ erro: erro.message }) };
+    try {
+      await enviar(email, 'Seu trial Vertex Risk — 15 dias grátis', htmlVisitante);
+    } catch (erroEnvio) {
+      return new Response(
+        JSON.stringify({ erro: 'Falha ao enviar e-mail pro visitante: ' + erroEnvio.message }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    try {
+      await enviar(env.NOTIFY_EMAIL, `Novo trial: ${nome}`, `<p>${nome} (${email}) acabou de solicitar o trial de 15 dias.</p>`);
+    } catch (erroNotify) {
+      // Não bloqueia o sucesso pro visitante se só a notificação interna falhar
+      console.error('Falha ao notificar Arthur:', erroNotify.message);
+    }
+
+    return new Response(
+      JSON.stringify({ ok: true, downloadLink: env.DOWNLOAD_LINK }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (erroGeral) {
+    return new Response(
+      JSON.stringify({ erro: 'Erro inesperado na função: ' + (erroGeral && erroGeral.message ? erroGeral.message : String(erroGeral)) }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
-};
+}
+
+"Melhora tratamento de erro"
