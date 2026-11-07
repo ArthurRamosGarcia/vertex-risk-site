@@ -95,7 +95,7 @@ export async function onRequestPost(context) {
       const r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: 'Vertex Risk <contato@vertexrisk.com.br>', to, subject, html: body }),
+        body: JSON.stringify({ from: 'Vertex Risk <contato@vertexrisk.com.br>', reply_to: 'vertexrisk@gmail.com', to, subject, html: body }),
       });
       if (!r.ok) throw new Error(`Resend ${r.status}: ${await r.text()}`);
     };
