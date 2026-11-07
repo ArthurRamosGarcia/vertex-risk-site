@@ -440,7 +440,7 @@
       <h1>Risco de portfólio,<br>calculado onde<br>você já <em>trabalha</em>.</h1>
       <p class="hero-sub">VaR, Expected Shortfall, Monte Carlo, correlação e mais de vinte ferramentas quantitativas — direto na sua planilha, sem exportar dado nenhum pra lugar nenhum.</p>
       <div class="hero-ctas">
-        <a href="#" class="btn-primary" onclick="abrirModalTrial(event)">Baixar grátis — 15 dias →</a>
+        <a href="#" class="btn-primary" onclick="abrirModalTrial(event)">Testar grátis por 15 dias →</a>
         <a href="#recursos" class="btn-secondary">Ver recursos</a>
       </div>
       <div class="hero-trust">
@@ -546,7 +546,7 @@
     </div>
     <div class="reveal" style="max-width:640px; margin:0 auto 40px; text-align:center; background:var(--green-pale); border:1px solid var(--green); border-radius:8px; padding:24px 28px;">
       <div style="font-family:var(--mono); font-weight:600; font-size:14px; color:var(--green-deep); margin-bottom:14px;">Teste grátis por 15 dias, sem cartão de crédito — o mesmo instalador já libera o modo de teste.</div>
-      <a href="#" class="btn-primary" onclick="abrirModalTrial(event)" style="display:inline-flex;">Baixar e testar agora →</a>
+      <a href="#" class="btn-primary" onclick="abrirModalTrial(event)" style="display:inline-flex;">Testar grátis por 15 dias →</a>
     </div>
     <div class="pricing-grid reveal">
       <div class="price-card">
@@ -766,13 +766,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
       document.getElementById('trialFormWrap').style.display = 'none';
       document.getElementById('trialSucesso').style.display = 'block';
-      document.getElementById('trialLinkDownload').href = dados.downloadLink;
+      document.getElementById('trialEmailEnviado').textContent = email;
     } catch (err) {
       erroEl.textContent = err.message;
       erroEl.style.display = 'block';
     } finally {
       btnEnviar.disabled = false;
-      btnEnviar.textContent = 'Quero testar grátis →';
+      btnEnviar.textContent = 'Testar grátis por 15 dias →';
     }
   });
 });
@@ -783,7 +783,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     <div id="trialFormWrap">
       <h3 style="font-family:'Fraunces',serif; font-size:24px; color:#16201A; margin-bottom:8px;">Teste grátis por 15 dias</h3>
-      <p style="color:#5B655D; font-size:14.5px; margin-bottom:24px;">Sem cartão de crédito. Você recebe o instalador e o guia completo por e-mail.</p>
+      <p style="color:#5B655D; font-size:14.5px; margin-bottom:24px;">Sem cartão de crédito. Você recebe por e-mail o instalador e a <strong>chave de acesso</strong>, juntos. Use um e-mail que você acessa agora.</p>
 
       <form id="trialForm">
         <label style="display:block; font-family:var(--mono); font-size:12px; color:#8B948A; margin-bottom:6px;">NOME</label>
@@ -794,15 +794,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <div id="trialErro" style="display:none; background:#FBEAEA; color:#B03434; border-radius:6px; padding:10px 14px; font-size:13.5px; margin-bottom:16px;"></div>
 
-        <button id="trialBtnEnviar" type="submit" class="btn-primary" style="width:100%; justify-content:center; border:none; cursor:pointer;">Quero testar grátis →</button>
+        <button id="trialBtnEnviar" type="submit" class="btn-primary" style="width:100%; justify-content:center; border:none; cursor:pointer;">Testar grátis por 15 dias →</button>
       </form>
     </div>
 
     <div id="trialSucesso" style="display:none; text-align:center;">
       <div style="width:52px; height:52px; background:#E4EFE8; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; font-size:26px; color:#1D7346;">✓</div>
       <h3 style="font-family:'Fraunces',serif; font-size:22px; color:#16201A; margin-bottom:10px;">Tudo certo!</h3>
-      <p style="color:#5B655D; font-size:14.5px; margin-bottom:24px; line-height:1.6;">Mandamos um e-mail com o instalador e o guia completo. Se quiser, já pode baixar direto aqui também:</p>
-      <a id="trialLinkDownload" href="#" class="btn-primary" style="width:100%; justify-content:center;">Baixar agora →</a>
+      <p style="color:#5B655D; font-size:14.5px; margin-bottom:12px; line-height:1.6;">Enviamos o <strong>instalador e a chave de teste de 15 dias</strong>, juntos no mesmo e-mail, para <strong id="trialEmailEnviado"></strong>.</p>
+      <p style="color:#8B948A; font-size:13px; margin-bottom:24px; line-height:1.6;">Não chegou em alguns minutos? Olhe a caixa de spam ou promoções. A chave só é enviada por e-mail.</p>
+      <button type="button" onclick="fecharModalTrial()" class="btn-secondary" style="width:100%; justify-content:center; cursor:pointer;">Fechar</button>
     </div>
   </div>
 </div>
